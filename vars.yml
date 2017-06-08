@@ -9,7 +9,7 @@ install_logging: true
 install_idm: htpasswd
 multi_tenant: false
 delete_volumes_on_termination: true
-# Note - below not needed when run from Tower... 
+# Note - below is needed for openshift install (as tower won't pass creds to a template)
 #aws_access_key_id:  YourKey
 #aws_secret_access_key: YourSecret
 
