@@ -1,7 +1,6 @@
 ---
 ocp_cluster_name: ocp1
-#hosted_zone_id: ZBI0PZRVR9A0O
-hosted_zone_domain_name: redhatapps.com
+hosted_zone_domain_name: example.com
 rhel_subscription_user: yourrhnname
 rhel_subscription_pass: yourrhnpassword
 ansible_user: ec2-user
