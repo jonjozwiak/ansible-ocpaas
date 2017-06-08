@@ -1,4 +1,16 @@
 ---
-  - include: ec2_instances_undo.yml
-  - include: awsprepundo.yml
+
+- name: Unregister from RHN
+  hosts:
+    - "{{ ('tag_Cluster_' ~ ocp_cluster_name) | replace('-', '_') }}"
+  vars_files:
+    - "vars.yml"
+  gather_facts: false
+  any_errors_fatal: True
+  become: true
+  roles:
+    - { role: common_undo }
+
+- include: ec2_instances_undo.yml
+- include: awsprepundo.yml
 
