@@ -1,9 +1,9 @@
-= OpenShift Container Platform as a Service
+# OpenShift Container Platform as a Service
 This repo provides Ansible playbooks to provision OpenShift as a service.  It's intended to be used with CloudForms and Ansible Tower in a service catalog 
 
 NOTE: This requires Ansible 2.3 (from epel)!  Make certain Tower is at 2.3 for this to work
 
-== Setup EC2 dynamic inventory
+## Setup EC2 dynamic inventory
 If you're testing this with Ansible core (outside of Tower), you will need to setup dynamic inventory to EC2.  To do this, use the following process: 
 
 ```
@@ -33,7 +33,7 @@ host_key_checking = False
 ansible -i /etc/ansible/ec2.py -e ansible_user=ec2-user -m ping all
 ```
 
-== Steps to deploy OpenShift on AWS 
+## Steps to deploy OpenShift on AWS 
 These steps are used to manually execute via Ansible core.  
 
 ```
@@ -54,7 +54,7 @@ tail -f /home/ec2-user/ansible.log
 Atomic openshift master failed to start... 
 Couldn't create retry file... 
 
-== Quick Validation
+## Quick Validation
 ```
    # Would be nice to put this in Ansible too 
 # From bastion1 
@@ -88,7 +88,7 @@ oadm policy add-cluster-role-to-user cluster-admin admin
 # Should probably add a test app here... Something like spinning up hello-openshift... 
 ```
 
-== Known Issues
+## Known Issues
 * In Ansible 2.3, route 53 entries are only create or delete.  They are not idempotent.  If you rerun ansible and it provisions different hosts it will not correct the entries.  Ansible 2.4 makes these modules idempotent
 * On reruns of openshift-prep, it will unregister / reregister every time and redo all the repos.  Some work is needed to get this to run idempotent...
 * Delete local SSH key (in openshift_prep.yaml) fails due to it running 5 times at once (based on 5 hosts).  Refactor this somehow (add a wait?)
@@ -110,7 +110,7 @@ NEXT STEPS:
 
 
 
-== Resources
+## Resources
 
 Security Hardened playbooks are from Ansible Lockdown: 
 https://github.com/ansible/ansible-lockdown
@@ -128,7 +128,7 @@ This goes into all the other OpenShift + CloudForms config - should point me to 
 https://github.com/redhat-cop/openshift-playbooks/blob/master/playbooks/operationalizing/cloudforms.adoc
 
 
-== Tower Workflow 
+## Tower Workflow 
 1. Add OCPaaS playbooks as a project (either through manual, or via git)
 2. Settings -> Credentials -> +ADD 
    Add your AWS Credentials 
