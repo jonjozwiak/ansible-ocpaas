@@ -10,8 +10,13 @@ install_idm: htpasswd
 multi_tenant: false
 delete_volumes_on_termination: true
 # Note - below not needed when run from Tower... 
+#aws_access_key_id: ""
+#aws_secret_access_key: ""
 #aws_access_key_id:  YourKey
 #aws_secret_access_key: YourSecret
+
+# Note - s3 bucket must be unique across ALL s3.  Not just your account
+registry_s3_name: registry-s3-{{ ocp_cluster_name }}
 
 region: "us-east-1"
 keypair: "mykeypair"		# Name of keypair to be created in AWS

@@ -24,7 +24,8 @@
     ansibletower_host: "tower.example.com"
     ansibletower_user: "admin"
     ansibletower_password: "secret"
+    ansibletower_workflow: "ocp-deploy
   tasks:
   - name: Execute OCP on AWS Workflow
-    shell: tower-cli config host {{ ansibletower_host }} ; tower-cli config username {{ ansibletower_user }} ; tower-cli config password {{ ansibletower_password }} ; tower-cli workflow_job launch -W "ocp-deploy" -e "install_idm={{ install_idm }} ocp_cluster_name={{ ocp_cluster_name }} install_metrics={{ install_metrics }} install_logging={{ install_logging }} install_idm={{ install_idm }} multi_tenant={{ multi_tenant }} region={{ region }} keypair={{ keypair }} keypair_pub={{ keypair_pub }} security_group_name={{ security_group_name }} create_vpc={{ create_vpc }} vpc_name={{ vpc_name }} vpc_cidr_block={{ vpc_cidr_block }} vpc_subnet_cidr={{ vpc_subnet_cidr }} delete_volumes_on_termination={{ delete_volumes_on_termination }}" --monitor --wait --timeout 86400
+    shell: tower-cli config host {{ ansibletower_host }} ; tower-cli config username {{ ansibletower_user }} ; tower-cli config password {{ ansibletower_password }} ; tower-cli workflow_job launch -W "{{ ansibletower_workflow }}" -e "install_idm={{ install_idm }} ocp_cluster_name={{ ocp_cluster_name }} install_metrics={{ install_metrics }} install_logging={{ install_logging }} install_idm={{ install_idm }} multi_tenant={{ multi_tenant }} region={{ region }} keypair={{ keypair }} keypair_pub='{{ keypair_pub }}' security_group_name={{ security_group_name }} create_vpc={{ create_vpc }} vpc_name={{ vpc_name }} vpc_cidr_block={{ vpc_cidr_block }} vpc_subnet_cidr={{ vpc_subnet_cidr }} delete_volumes_on_termination={{ delete_volumes_on_termination }}" --monitor --wait --timeout 86400
 
