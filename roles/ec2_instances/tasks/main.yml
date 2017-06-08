@@ -18,6 +18,7 @@
         Name: "{{ 'bastion' + item }}"
         AnsibleGroup: bastions
         Cluster: "{{ ocp_cluster_name }}"
+        KubernetesCluster: "{{ ocp_cluster_name }}"
         ClusterRole: "{{ ocp_cluster_name }}-bastion"
       exact_count: 1
       count_tag: 
@@ -43,6 +44,7 @@
         Name: "{{ 'node' + item }}"
         AnsibleGroup: nodes
         Cluster: "{{ ocp_cluster_name }}"
+        KubernetesCluster: "{{ ocp_cluster_name }}"
         ClusterRole: "{{ ocp_cluster_name }}-node"
       exact_count: 1
       count_tag:
@@ -76,6 +78,7 @@
         Name: "{{ 'infranode' + item }}"
         AnsibleGroup: infranodes
         Cluster: "{{ ocp_cluster_name }}"
+        KubernetesCluster: "{{ ocp_cluster_name }}"
         ClusterRole: "{{ ocp_cluster_name }}-infranode"
       exact_count: 1
       count_tag:
@@ -109,6 +112,7 @@
         Name: "{{ 'master' + item }}"
         AnsibleGroup: masters
         Cluster: "{{ ocp_cluster_name }}"
+        KubernetesCluster: "{{ ocp_cluster_name }}"
         ClusterRole: "{{ ocp_cluster_name }}-master"
       exact_count: 1
       count_tag:

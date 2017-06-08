@@ -93,6 +93,7 @@ oadm policy add-cluster-role-to-user cluster-admin admin
 * On reruns of openshift-prep, it will unregister / reregister every time and redo all the repos.  Some work is needed to get this to run idempotent...
 * Delete local SSH key (in openshift_prep.yaml) fails due to it running 5 times at once (based on 5 hosts).  Refactor this somehow (add a wait?)
 * openshift_prep.yaml should move tasks into roles... not keep in the overall playbook
+* I don't believe EBS dynamic provisioning works if your cluster spans AZs.  (in OCP 3.5).  I'm not 100% certain though
 
 * Setting hostnames breaks AWS cloud config (openshift_set_hostname=True).  As we want dynamic provisioning of AWS volumes, I've disabled setting hostnames 
 https://github.com/openshift/origin/issues/6747
