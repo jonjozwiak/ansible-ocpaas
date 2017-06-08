@@ -1,0 +1,26 @@
+common_packages: 
+  - python
+  - unzip
+  - bash-completion
+  - tmux
+  - bind-utils
+  - net-tools
+  - iptables-services
+  - bridge-utils
+  - yum-versionlock
+  - wget
+  - git
+  - vim-enhanced
+  - vim
+  - tmux
+  - ntp
+  - ansible
+  - sos
+  - psacct
+  - httpd-tools
+  - atomic-openshift-utils
+  - atomic-openshift-excluder
+  - atomic-openshift-docker-excluder
+
+docker_device: /dev/xvdb
+

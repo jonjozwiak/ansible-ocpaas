@@ -1,0 +1,15 @@
+---
+
+# Run on bastion host
+- name: Deploy Openshift 
+  hosts:
+    - "{{ ('tag_ClusterRole_' ~ ocp_cluster_name ~ '_bastion') | replace('-', '_') }}"
+  vars_files:
+    - "vars.yml"
+
+  gather_facts: False
+  become: false
+  roles:
+    - { role: openshift_install }
+
+

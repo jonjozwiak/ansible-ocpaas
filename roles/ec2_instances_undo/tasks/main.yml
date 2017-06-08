@@ -1,0 +1,223 @@
+ 
+##### Gather instance IDs
+
+  - name: Get instance ids for bastions
+    ec2_remote_facts:
+      region: "{{ region }}"
+      filters:
+        "tag:ClusterRole": "{{ ocp_cluster_name }}-bastion"
+        instance-state-name: running
+    register: ec2_bastions
+
+  - name: Get instance ids for masters
+    ec2_remote_facts:
+      region: "{{ region }}"
+      filters:
+        "tag:ClusterRole": "{{ ocp_cluster_name }}-master"
+        instance-state-name: running
+    register: ec2_masters
+
+  - name: Get instance ids for infra nodes
+    ec2_remote_facts:
+      region: "{{ region }}"
+      filters:
+        "tag:ClusterRole": "{{ ocp_cluster_name }}-infranode"
+        instance-state-name: running
+    register: ec2_infranodes
+
+  - name: Get instance ids for nodes
+    ec2_remote_facts:
+      region: "{{ region }}"
+      filters:
+        "tag:ClusterRole": "{{ ocp_cluster_name }}-node"
+        instance-state-name: running
+    register: ec2_nodes
+
+
+##### Remove External DNS for bastion 
+
+  - name: Get record for bastion public DNS Entry
+    route53:
+      command: get
+      zone: "{{ hosted_zone_domain_name }}"
+      record: "{{ item.tags.Name }}.{{ public_dns }}"
+      type: A
+    with_items: "{{ ec2_bastions.instances }}"
+    register: bastionpubdns
+
+  - name: Delete Bastion Public DNS Entry if it doesn't exist
+    route53:
+      #state: absent ## Added in Ansible 2.4 will remove need for when statement below
+      command: delete
+      zone: "{{ hosted_zone_domain_name }}"
+      record: "{{ item.item.tags.Name }}.{{ public_dns }}"
+      type: A
+      value: "{{ item.item.public_ip_address }}"
+    with_items: "{{ bastionpubdns.results }}"
+    when: "{} != item.set"
+ 
+##### Remove Internal DNS records for all instances
+
+  - name: Get internal DNS records for bastions
+    route53:
+      command: get
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+    with_items: "{{ ec2_bastions.instances }}"
+    register: bastionsintdns
+
+  - name: Create Internal DNS Entry for bastions if it doesn't exist
+    route53:
+      #state: absent ## Added in Ansible 2.4 will remove need for when statement below
+      command: delete 
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+      value: "{{ item.item.private_ip_address }}"
+    with_items: "{{ bastionsintdns.results }}"
+    when: "{} != item.set"
+
+  - name: Get internal DNS records for masters
+    route53:
+      command: get
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+    with_items: "{{ ec2_masters.instances }}"
+    register: mastersintdns
+
+  - name: Delete Internal DNS Entry for masters if it doesn't exist
+    route53:
+      #state: absent ## Added in Ansible 2.4 will remove need for when statement below
+      command: delete
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+      value: "{{ item.item.private_ip_address }}"
+    with_items: "{{ mastersintdns.results }}"
+    when: "{} != item.set"
+
+  - name: Get internal DNS records for infra nodes
+    route53:
+      command: get
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+    with_items: "{{ ec2_infranodes.instances }}"
+    register: infranodesintdns
+
+  - name: Delete Internal DNS Entry for infra nodes if it doesn't exist
+    route53:
+      #state: absent ## Added in Ansible 2.4 will remove need for when statement below
+      command: delete
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+      value: "{{ item.item.private_ip_address }}"
+    with_items: "{{ infranodesintdns.results }}"
+    when: "{} != item.set"
+
+  - name: Get internal DNS records for nodes
+    route53:
+      command: get
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+    with_items: "{{ ec2_nodes.instances }}"
+    register: nodesintdns
+
+  - name: Delete Internal DNS Entry for nodes if it doesn't exist
+    route53:
+      #state: absent ## Added in Ansible 2.4 will remove need for when statement below
+      command: delete
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+      value: "{{ item.item.private_ip_address }}"
+    with_items: "{{ nodesintdns.results }}"
+    when: "{} != item.set"
+
+#####  Remove instances from load balancers 
+
+  - name: Get instance ids for masters
+    ec2_remote_facts:
+      region: "{{ region }}"
+      filters:
+        "tag:ClusterRole": "{{ ocp_cluster_name }}-master"
+        instance-state-name: running
+    register: ec2_masters
+
+  - name: Remove Masters from Master ELB
+    ec2_elb:
+      state: absent
+      region: "{{ region }}"
+      instance_id: "{{ item.id }}"
+      ec2_elbs: "{{ master_lb_name }}"
+    with_items: "{{ ec2_masters.instances }}"
+    ignore_errors: true
+
+  - name: Get instance ids for infra nodes
+    ec2_remote_facts:
+      region: "{{ region }}"
+      filters:
+        "tag:ClusterRole": "{{ ocp_cluster_name }}-infranode"
+        instance-state-name: running
+    register: ec2_infranodes
+
+  - name: Remove Infra Nodes from Router ELB
+    ec2_elb:
+      state: absent
+      region: "{{ region }}"
+      instance_id: "{{ item.id }}"
+      ec2_elbs: "{{ router_lb_name }}"
+    with_items: "{{ ec2_infranodes.instances }}"
+
+##### Terminate instances for the cluster 
+
+  - name: Find VCP Subnet for the cluster
+    ec2_vpc_subnet_facts:
+      region: "{{ region }}"
+      filters:
+        "tag:Name": "{{ 'subnet-' + ocp_cluster_name }}"
+    register: vpc_subnet
+
+  - name: Get instance ids for all instances in the cluster
+    ec2_remote_facts:
+      region: "{{ region }}"
+      filters:
+        "tag:Cluster": "{{ ocp_cluster_name }}"
+        instance-state-name: running
+    register: ec2_cluster_nodes
+
+  - name: Terminate all nodes in the cluster
+    ec2:
+      state: absent 
+      wait: true
+      wait_timeout: 500
+      region: "{{ region }}"
+      instance_ids: "{{ item.id }}"
+      vpc_subnet_id: "{{ vpc_subnet.subnets[0].id }}"
+      assign_public_ip: yes
+    with_items: "{{ ec2_cluster_nodes.instances }}"
+    register: terminate_cluster_jobs
+    async: 7200
+    poll: 0
+
+  - name: Wait for cluster instances to terminate 
+    async_status: jid="{{ item.ansible_job_id }}"
+    register: cluster_instances
+    until: cluster_instances.finished
+    retries: 300
+    with_items: "{{ terminate_cluster_jobs.results }}"
+
+
+

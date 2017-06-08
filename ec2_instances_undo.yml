@@ -1,0 +1,14 @@
+---
+- name: Remove ec2 instances
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  user: root
+  #vars:
+  #  ocp_cluster_name: ocp1
+  #  hosted_zone_domain_name: redhatapps.com
+  vars_files:
+    - "vars.yml"
+  roles:
+    - { role: ec2_instances_undo }
+

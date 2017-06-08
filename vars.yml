@@ -1,0 +1,34 @@
+---
+ocp_cluster_name: ocp1
+#hosted_zone_id: ZBI0PZRVR9A0O
+hosted_zone_domain_name: redhatapps.com
+rhel_subscription_user: yourrhnname
+rhel_subscription_pass: yourrhnpassword
+ansible_user: ec2-user
+install_metrics: true
+install_logging: true
+install_idm: htpasswd
+multi_tenant: false
+delete_volumes_on_termination: true
+# Note - below not needed when run from Tower... 
+#aws_access_key_id:  YourKey
+#aws_secret_access_key: YourSecret
+
+region: "us-east-1"
+keypair: "mykeypair"		# Name of keypair to be created in AWS
+# Public keypair (ie ssh-rsa ....... user@example.com) - /home/user/.ssh/id_rsa.pub
+keypair_pub: "" 
+security_group_name: "openshiftsg"
+# t2.large = 2vCPU, 8GB RAM.  t2.xlarge = 4vCPU, 16GB RAM
+
+create_vpc: True
+# VPC subnet id and vpc id required when not creating your own... 
+# vpc_net.vpc.id: vpc-1234abcd
+# vpc_subnet.subnet.id: subnet-1234abcd
+
+vpc_name: vpc_openshift_{{ ocp_cluster_name }}
+vpc_cidr_block: 10.10.0.0/16
+vpc_subnet_cidr: 10.10.0.0/24
+
+
+

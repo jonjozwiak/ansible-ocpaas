@@ -1,0 +1,48 @@
+---
+
+# Create ansible inventory template 
+#
+# Example from ansible agnostic deployer
+   
+#- name: Configuring openshift-provisioner
+#  hosts: "{{ ('tag_' ~ env_type ~ '_' ~ guid ~ '_bastion') | replace('-', '_') }}"
+#  gather_facts: False
+#  become: yes
+#  vars_files:
+#    - "../configs/{{ env_type }}/env_vars.yml"
+#    - "../configs/{{ env_type }}/ssh_vars.yml"
+#  roles:
+#    - "../roles/openshift-provisioner"
+#  tags:
+#    - openshift_provisioner_tasks
+
+# Execute OpenShift Install... 
+
+- name: generate ansible hosts file
+  become: true
+  template:
+    src: "hosts_template.j2"
+    dest: "/etc/ansible/hosts-{{ ocp_cluster_name }}"
+
+- name: Add log path to Ansible configuration
+  become: true
+  lineinfile:
+    regexp: "^#log_path"
+    dest: "/etc/ansible/ansible.cfg"
+    line: "log_path = /home/ec2-user/ansible.log"
+    backrefs: yes
+    state: present
+
+- name: Disable Host Key checking in Ansible configuration
+  become: true
+  lineinfile:
+    regexp: "^#host_key_checking"
+    dest: "/etc/ansible/ansible.cfg"
+    line: "host_key_checking = False"
+    backrefs: yes
+    state: present
+
+- name: Run OpenShift Advanced Installer 
+  shell: "ansible-playbook -i /etc/ansible/hosts-{{ ocp_cluster_name }} /usr/share/ansible/openshift-ansible/playbooks/byo/config.yml"
+  register: openshift_install_log
+

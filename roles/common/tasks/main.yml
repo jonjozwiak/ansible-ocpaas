@@ -1,0 +1,90 @@
+---
+### RHN Subscription
+
+- name: list current repository files
+  shell: "ls -1 /etc/yum.repos.d/"
+  register: repodircontents
+
+- name: remove current repository files
+  file:
+    path: /etc/yum.repos.d/{{ item }}
+    state: absent
+  with_items: "{{ repodircontents.stdout_lines }}"
+  ignore_errors: true
+
+- name: Force unregister before register
+  redhat_subscription:
+    state: absent
+  register: task_result
+  until: task_result | succeeded
+  retries: 10
+  delay: 5
+
+- name: register node with subscription-manager
+  redhat_subscription:
+    state: present
+    username: "{{ rhel_subscription_user }}"
+    password: "{{ rhel_subscription_pass }}"
+    autosubscribe: false
+  register: task_result
+  until: task_result | succeeded
+  retries: 10
+  delay: 5
+
+- name: get correct pool id
+  shell: /usr/bin/subscription-manager list --all --available --matches="*{{rhn_pool_id_string}}*" | awk '/Pool ID/ {print $3}' | head -1
+  register: pool_id
+  ignore_errors: no
+  until: pool_id | succeeded
+  retries: 15
+  delay: 10
+
+- name: attach host to subscription pool
+  shell: /usr/bin/subscription-manager attach --pool={{ pool_id.stdout }}
+  register: task_result
+  until: task_result.rc == 0
+  retries: 15
+  delay: 10
+  ignore_errors: no
+
+### Repositories 
+
+- name: disable all repos
+  command: subscription-manager repos --disable=*
+  when: use_subscription_manager | default(false)
+  register: task_result
+  until: task_result | succeeded
+  retries: 10
+  delay: 5
+
+- name: enable repos for rhel
+  command: subscription-manager repos --enable "{{ item }}"
+  with_items:
+    - '{{ rhel_repos }}'
+  when: use_subscription_manager | default(false)
+  register: task_result
+  until: task_result | succeeded
+  retries: 10
+  delay: 5
+
+### Package Install / Update
+- name: install basic packages
+  yum:
+    name: "{{ item }}"
+    state: present
+  with_items: "{{common_packages}}"
+
+- name: Update all packages
+  yum:
+    name: '*'
+    state: latest
+  when: update_packages
+
+- name: Enable and start chronyd
+  service:
+    name: chronyd
+    state: started
+    enabled: yes
+
+### SET ENV AUTH KEY??  -- ie a specific key for other users..
+### All ready for overall deployment...

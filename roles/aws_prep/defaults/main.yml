@@ -1,0 +1,30 @@
+---
+region: "us-east-1"
+keypair: "mykeypair"            # Name of keypair to be created in AWS
+# Public keypair (ie ssh-rsa ....... user@example.com) - /home/user/.ssh/id_rsa.pub
+keypair_pub: ""
+security_group_name: "openshiftsg"
+# t2.large = 2vCPU, 8GB RAM.  t2.xlarge = 4vCPU, 16GB RAM
+
+create_vpc: True
+# VPC subnet id and vpc id required when not creating your own... 
+# vpc_id: vpc-1234abcd
+# vpc_subnet_id: subnet-1234abcd
+
+ocp_cluster_name: ocp1
+router_lb_name: elbrouter-{{ ocp_cluster_name }}
+master_lb_name: elbmaster-{{ ocp_cluster_name }} 
+registry_s3_name: registry-s3-{{ ocp_cluster_name }}
+
+hosted_zone_id: XXXXXXXXXXXXX           # Your Route 53 Hosted Zone (example.com.)
+hosted_zone_domain_name: example.com
+public_dns: "{{ ocp_cluster_name }}.{{ hosted_zone_domain_name }}"
+apps_wildcard_dns: "*.apps.{{ public_dns }}"
+master_lb_dns: "master.{{ public_dns }}"
+zone_internal_dns: "{{ ocp_cluster_name }}.internal."
+chomped_zone_internal_dns: "{{ ocp_cluster_name }}.internal"
+
+vpc_name: vpc_openshift
+vpc_cidr_block: 10.10.0.0/16
+vpc_subnet_cidr: 10.10.0.0/24
+

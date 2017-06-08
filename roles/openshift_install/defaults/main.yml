@@ -1,0 +1,39 @@
+ocp_cluster_name: ocp1
+region: us-east-1
+remote_user: ec2-user
+keypair: "mykeypair"            # Name of keypair to be created in AWS
+
+
+ansible_ssh_user: ec2-user
+install_metrics: true
+install_logging: true
+# For idm, htpasswd or allow_all are options
+install_idm: htpasswd
+
+master_api_port: 443
+# Set multitenant to true to deploy openshift-ovs-multitenant
+multi_tenant: false
+### Delete the below 2 settings
+#multi_tenant_setting: ""
+#multi_tenant_setting: "os_sdn_network_plugin_name='redhat/openshift-ovs-multitenant'"
+
+router_lb_name: elbrouter-{{ ocp_cluster_name }}
+master_lb_name: elbmaster-{{ ocp_cluster_name }}
+registry_s3_name: registry-s3-{{ ocp_cluster_name }}
+
+hosted_zone_domain_name: example.com
+public_dns: "{{ ocp_cluster_name }}.{{ hosted_zone_domain_name }}"
+cloudapps_suffix: "apps.{{ public_dns }}"
+apps_wildcard_dns: "*.apps.{{ public_dns }}"
+master_lb_dns: "master.{{ public_dns }}"
+zone_internal_dns: "{{ ocp_cluster_name }}.internal."
+chomped_zone_internal_dns: "{{ ocp_cluster_name }}.internal"
+
+openshift_master_overwrite_named_certificates: true
+
+
+aws_access_key_id:  YourKey 
+aws_secret_access_key: YourSecret
+
+
+

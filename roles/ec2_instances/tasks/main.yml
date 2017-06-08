@@ -1,0 +1,330 @@
+  - name: Find VCP Subnet for the cluster
+    ec2_vpc_subnet_facts:
+      region: "{{ region }}"
+      filters:
+        "tag:Name": "{{ 'subnet-' + ocp_cluster_name }}"
+    register: vpc_subnet
+
+  - name: Create Bastion Hosts
+    ec2:
+      key_name: "{{ keypair }}"
+      group: "{{ security_group_name }}"
+      region: "{{ region }}"
+      instance_type: "{{ bastion_instance_type }}"
+      image: "{{ amis[region] }}"
+      wait: true
+      wait_timeout: 500
+      instance_tags:
+        Name: "{{ 'bastion' + item }}"
+        AnsibleGroup: bastions
+        Cluster: "{{ ocp_cluster_name }}"
+        ClusterRole: "{{ ocp_cluster_name }}-bastion"
+      exact_count: 1
+      count_tag: 
+        Name: "{{ 'bastion' + item }}"
+        Cluster: "{{ ocp_cluster_name }}"
+      vpc_subnet_id: "{{ vpc_subnet.subnets[0].id }}"
+      assign_public_ip: yes 
+    with_sequence: count={{ bastion_instance_count }}
+    register: bastion_jobs
+    async: 7200
+    poll: 0
+
+  - name: Create Nodes Hosts
+    ec2:
+      key_name: "{{ keypair }}"
+      group: "{{ security_group_name }}"
+      region: "{{ region }}"
+      instance_type: "{{ node_instance_type }}"
+      image: "{{ amis[region] }}"
+      wait: true
+      wait_timeout: 500
+      instance_tags:
+        Name: "{{ 'node' + item }}"
+        AnsibleGroup: nodes
+        Cluster: "{{ ocp_cluster_name }}"
+        ClusterRole: "{{ ocp_cluster_name }}-node"
+      exact_count: 1
+      count_tag:
+        Name: "{{ 'node' + item }}"
+        Cluster: "{{ ocp_cluster_name }}"
+      vpc_subnet_id: "{{ vpc_subnet.subnets[0].id }}"
+      assign_public_ip: yes
+      volumes:
+        - device_name: /dev/xvda
+          volume_size: "{{ node_disk1_size }}"
+          delete_on_termination: "{{ delete_volumes_on_termination }}"
+        - device_name: /dev/xvdb
+          volume_type: gp2
+          volume_size: "{{ node_disk2_size }}"
+          delete_on_termination: "{{ delete_volumes_on_termination }}"
+    with_sequence: count={{ node_instance_count }}
+    register: node_jobs
+    async: 7200
+    poll: 0
+
+  - name: Create Infra Nodes Hosts
+    ec2:
+      key_name: "{{ keypair }}"
+      group: "{{ security_group_name }}"
+      region: "{{ region }}"
+      instance_type: "{{ infranode_instance_type }}"
+      image: "{{ amis[region] }}"
+      wait: true
+      wait_timeout: 500
+      instance_tags:
+        Name: "{{ 'infranode' + item }}"
+        AnsibleGroup: infranodes
+        Cluster: "{{ ocp_cluster_name }}"
+        ClusterRole: "{{ ocp_cluster_name }}-infranode"
+      exact_count: 1
+      count_tag:
+        Name: "{{ 'infranode' + item }}"
+        Cluster: "{{ ocp_cluster_name }}"
+      vpc_subnet_id: "{{ vpc_subnet.subnets[0].id }}"
+      assign_public_ip: yes
+      volumes:
+        - device_name: /dev/xvda
+          volume_size: "{{ infranode_disk1_size }}"
+          delete_on_termination: "{{ delete_volumes_on_termination }}"
+        - device_name: /dev/xvdb
+          volume_type: gp2
+          volume_size: "{{ infranode_disk2_size }}"
+          delete_on_termination: "{{ delete_volumes_on_termination }}"
+    with_sequence: count={{ infranode_instance_count }}
+    register: infranode_jobs
+    async: 7200
+    poll: 0
+
+  - name: Create Master Hosts
+    ec2:
+      key_name: "{{ keypair }}"
+      group: "{{ security_group_name }}"
+      region: "{{ region }}"
+      instance_type: "{{ master_instance_type }}"
+      image: "{{ amis[region] }}"
+      wait: true
+      wait_timeout: 500
+      instance_tags:
+        Name: "{{ 'master' + item }}"
+        AnsibleGroup: masters
+        Cluster: "{{ ocp_cluster_name }}"
+        ClusterRole: "{{ ocp_cluster_name }}-master"
+      exact_count: 1
+      count_tag:
+        Name: "{{ 'master' + item }}"
+        Cluster: "{{ ocp_cluster_name }}"
+      vpc_subnet_id: "{{ vpc_subnet.subnets[0].id }}"
+      assign_public_ip: yes
+      volumes:
+        - device_name: /dev/xvda
+          volume_size: "{{ master_disk1_size }}"
+          delete_on_termination: "{{ delete_volumes_on_termination }}"
+        - device_name: /dev/xvdb
+          volume_type: gp2
+          volume_size: "{{ master_disk2_size }}"
+          delete_on_termination: "{{ delete_volumes_on_termination }}"
+    with_sequence: count={{ master_instance_count }}
+    register: master_jobs
+    async: 7200
+    poll: 0
+
+  - name: Wait for bastion instance creation to complete
+    async_status: jid="{{ item.ansible_job_id }}"
+    register: bastion_instances
+    until: bastion_instances.finished
+    retries: 300
+    with_items: "{{ bastion_jobs.results }}"
+
+  - name: Wait for node instance creation to complete
+    async_status: jid="{{ item.ansible_job_id }}"
+    register: node_instances
+    until: node_instances.finished
+    retries: 300
+    with_items: "{{ node_jobs.results }}"
+
+  - name: Wait for infranode instance creation to complete
+    async_status: jid="{{ item.ansible_job_id }}"
+    register: infranode_instances
+    until: infranode_instances.finished
+    retries: 300
+    with_items: "{{ infranode_jobs.results }}"
+
+  - name: Wait for master instance creation to complete
+    async_status: jid="{{ item.ansible_job_id }}"
+    register: master_instances
+    until: master_instances.finished
+    retries: 300
+    with_items: "{{ master_jobs.results }}"
+
+  - name: Get instance ids for masters
+    ec2_remote_facts:
+      region: "{{ region }}"
+      filters:
+        "tag:ClusterRole": "{{ ocp_cluster_name }}-master"
+        instance-state-name: running
+    register: ec2_masters
+
+  #- debug: msg="{{ item.id }}"
+  #  with_items: "{{ ec2_masters.instances }}"
+
+  # Ignore errors as instances will not be listening on correct ports yet
+  - name: Add Masters to Master ELB 
+    ec2_elb:
+      state: present
+      region: "{{ region }}"
+      instance_id: "{{ item.id }}"
+      ec2_elbs: "{{ master_lb_name }}"
+    with_items: "{{ ec2_masters.instances }}"
+    ignore_errors: true
+
+  - name: Get instance ids for infra nodes 
+    ec2_remote_facts:
+      region: "{{ region }}"
+      filters:
+        "tag:ClusterRole": "{{ ocp_cluster_name }}-infranode"
+        instance-state-name: running
+    register: ec2_infranodes
+
+  - name: Add Infra Nodes to Router ELB 
+    ec2_elb:
+      state: present
+      region: "{{ region }}"
+      instance_id: "{{ item.id }}"
+      ec2_elbs: "{{ router_lb_name }}"
+    with_items: "{{ ec2_infranodes.instances }}"
+    ignore_errors: true
+
+  - name: Get instance ids for nodes
+    ec2_remote_facts:
+      region: "{{ region }}"
+      filters:
+        "tag:ClusterRole": "{{ ocp_cluster_name }}-node"
+        instance-state-name: running
+    register: ec2_nodes
+
+  - name: Get instance ids for bastions
+    ec2_remote_facts:
+      region: "{{ region }}"
+      filters:
+        "tag:ClusterRole": "{{ ocp_cluster_name }}-bastion"
+        instance-state-name: running
+    register: ec2_bastions
+
+##### Create Internal DNS records for all instances
+
+  - name: Get internal DNS records for bastions
+    route53:
+      command: get
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+    with_items: "{{ ec2_bastions.instances }}"
+    register: bastionsintdns
+
+  - name: Create Internal DNS Entry for bastions if it doesn't exist
+    route53:
+      #state: present ## Added in Ansible 2.4 will remove need for when statement below
+      command: create
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+      value: "{{ item.item.private_ip_address }}"
+    with_items: "{{ bastionsintdns.results }}"
+    when: "{} == item.set"
+
+  - name: Get internal DNS records for masters
+    route53:
+      command: get
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+    with_items: "{{ ec2_masters.instances }}"
+    register: mastersintdns
+
+  - name: Create Internal DNS Entry for masters if it doesn't exist
+    route53:
+      #state: present ## Added in Ansible 2.4 will remove need for when statement below
+      command: create
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+      value: "{{ item.item.private_ip_address }}"
+    with_items: "{{ mastersintdns.results }}"
+    when: "{} == item.set"
+
+  - name: Get internal DNS records for infra nodes
+    route53:
+      command: get
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+    with_items: "{{ ec2_infranodes.instances }}"
+    register: infranodesintdns
+
+  - name: Create Internal DNS Entry for infra nodes if it doesn't exist
+    route53:
+      #state: present ## Added in Ansible 2.4 will remove need for when statement below
+      command: create
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+      value: "{{ item.item.private_ip_address }}"
+    with_items: "{{ infranodesintdns.results }}"
+    when: "{} == item.set"
+
+  - name: Get internal DNS records for nodes
+    route53:
+      command: get
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+    with_items: "{{ ec2_nodes.instances }}"
+    register: nodesintdns
+
+  - name: Create Internal DNS Entry for nodes if it doesn't exist
+    route53:
+      #state: present ## Added in Ansible 2.4 will remove need for when statement below
+      command: create
+      zone: "{{ chomped_zone_internal_dns }}"
+      private_zone: true
+      record: "{{ item.item.tags.Name }}.{{ chomped_zone_internal_dns }}"
+      type: A
+      value: "{{ item.item.private_ip_address }}"
+    with_items: "{{ nodesintdns.results }}"
+    when: "{} == item.set"
+
+##### Create External DNS for bastion 
+
+  - name: Get record for bastion public DNS Entry
+    route53:
+      command: get
+      zone: "{{ hosted_zone_domain_name }}"
+      record: "{{ item.tags.Name }}.{{ public_dns }}"
+      type: A
+    with_items: "{{ ec2_bastions.instances }}"
+    register: bastionpubdns
+
+  - debug: var=ec2_bastions.instances
+
+  - debug: var=bastionpubdns
+
+  - name: Create Bastion Public DNS Entry if it doesn't exist
+    route53:
+      #state: present ## Added in Ansible 2.4 will remove need for when statement below
+      command: create
+      zone: "{{ hosted_zone_domain_name }}"
+      record: "{{ item.item.tags.Name }}.{{ public_dns }}"
+      type: A
+      value: "{{ item.item.public_ip_address }}"
+    with_items: "{{ bastionpubdns.results }}"
+    when: "{} == item.set"
+
+

@@ -1,0 +1,28 @@
+---
+- name: install basic packages
+  yum:
+    name: "{{ item }}"
+    state: present
+  with_items: "{{common_packages}}"
+
+- name: Use excluder to ensure correct docker version installed 
+  shell: atomic-openshift-excluder unexclude
+
+- name: Install docker
+  yum:
+    name: "docker"
+    state: present
+
+- name: Generate docker-storage-setup config
+  template:
+    src: ./sysconfig.docker-storage-setup.j2
+    dest: /etc/sysconfig/docker-storage-setup
+
+- name: Start and enable docker
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+
+

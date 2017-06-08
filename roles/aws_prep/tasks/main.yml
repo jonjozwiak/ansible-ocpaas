@@ -1,0 +1,194 @@
+  - name: Create Key Pair
+    ec2_key: 
+      name: "{{ keypair }}"
+      key_material: "{{ keypair_pub }}"
+      region: "{{ region }}"
+      state: present
+
+  - name: Create EC2 VPC 
+    ec2_vpc_net:
+      name: "{{ vpc_name }}"
+      cidr_block: "{{ vpc_cidr_block }}"
+      region: "{{ region }}"
+    register: vpc_net
+    when: create_vpc
+
+  - name: Create EC2 VPC Subnet
+    ec2_vpc_subnet:
+      state: present
+      vpc_id: "{{ vpc_net.vpc.id }}"
+      cidr: "{{ vpc_subnet_cidr }}"
+      region: "{{ region }}"
+      resource_tags:
+        Name: "{{ 'subnet-' + ocp_cluster_name }}"
+        Cluster: "{{ ocp_cluster_name }}"
+        ClusterRole: "{{ ocp_cluster_name }}-subnet"
+    register: vpc_subnet
+    when: create_vpc
+
+  - name: Create Internet Gateway 
+    ec2_vpc_igw:
+      vpc_id: "{{ vpc_net.vpc.id }}"
+      state: present
+      region: "{{ region }}"
+    register: igw
+    when: create_vpc
+
+  - name: Set up public subnet route table
+    ec2_vpc_route_table:
+      vpc_id: "{{ vpc_net.vpc.id }}"
+      region: "{{ region }}"
+      tags:
+        Name: Public
+      subnets:
+        - "{{ vpc_subnet.subnet.id }}"
+      routes:
+        - dest: 0.0.0.0/0
+          gateway_id: "{{ igw.gateway_id }}"
+    register: public_route_table
+    when: create_vpc
+
+  - name: Create security group 
+    ec2_group:
+      name: "{{ security_group_name }}"
+      description: "{{ security_group_name }}"
+      vpc_id: "{{ vpc_net.vpc.id }}"
+      region: "{{ region }}"
+      rules:  
+        - proto: udp
+          from_port: 0
+          to_port: 65535
+          cidr_ip: 0.0.0.0/0
+        - proto: tcp
+          from_port: 0
+          to_port: 65535
+          cidr_ip: 0.0.0.0/0
+        #- proto: tcp
+        #  from_port: 443
+        #  to_port: 443
+        #  cidr_ip: 0.0.0.0/0
+        #- proto: tcp 
+        #  from_port: 22
+        #  to_port: 22
+        #  cidr_ip: 0.0.0.0/0
+
+  - name: Create Router Load Balancer
+    ec2_elb_lb:
+      name: "{{ router_lb_name }}"
+      region: "{{ region }}"
+      state: present
+      subnets:
+        - "{{ vpc_subnet.subnet.id }}"
+      listeners:
+        - protocol: http
+          load_balancer_port: 80
+          instance_port: 80
+        - protocol: tcp
+          load_balancer_port: 443
+          instance_port: 443
+      health_check:
+        ping_protocol: tcp # options are http, https, ssl, tcp
+        ping_port: 80
+        #ping_path: "/index.html" # not required for tcp or ssl
+        response_timeout: 5 # seconds
+        interval: 10 # seconds
+        unhealthy_threshold: 2
+        healthy_threshold: 2
+      cross_az_load_balancing: yes
+      security_group_names:
+        - "{{ security_group_name }}"
+      tags: 
+        Name: "{{ router_lb_name }}"
+        Cluster: "{{ ocp_cluster_name }}"
+        ClusterRole: "{{ ocp_cluster_name }}-router-elb"
+    register: routerelb
+  
+  - name: Create Master Load Balancer
+    ec2_elb_lb:
+      name: "{{ master_lb_name }}"
+      region: "{{ region }}"
+      state: present
+      subnets:
+        - "{{ vpc_subnet.subnet.id }}"
+      listeners:
+        - protocol: tcp
+          load_balancer_port: 8443
+          instance_port: 8443
+        - protocol: tcp
+          load_balancer_port: 443
+          instance_port: 443
+      health_check:
+        ping_protocol: tcp # options are http, https, ssl, tcp
+        ping_port: 443
+        #ping_path: "/index.html" # not required for tcp or ssl
+        response_timeout: 3 # seconds
+        interval: 10 # seconds
+        unhealthy_threshold: 2
+        healthy_threshold: 2
+      cross_az_load_balancing: yes
+      security_group_names:
+        - "{{ security_group_name }}"
+      tags:
+        Name: "{{ master_lb_name }}"
+        Cluster: "{{ ocp_cluster_name }}"
+        ClusterRole: "{{ ocp_cluster_name }}-master-elb"
+    register: masterelb
+
+  - name: Get record for router ELB DNS Entry
+    route53:
+      command: get
+      zone: "{{ hosted_zone_domain_name }}"
+      record: "{{ apps_wildcard_dns }}"
+      type: A
+    register: routerelbrec
+
+  - name: Create Router ELB DNS Entry if it doesn't exist
+    route53:
+      #state: present ## Added in Ansible 2.4 will remove need for when statement below
+      command: create
+      zone: "{{ hosted_zone_domain_name }}"
+      record: "{{ apps_wildcard_dns }}"
+      type: A
+      value: "{{ routerelb.elb.dns_name }}"
+      alias: True
+      alias_hosted_zone_id: "{{ routerelb.elb.hosted_zone_id }}"
+    when: "{} == routerelbrec.set"
+
+  - name: Get record for master ELB DNS Entry
+    route53:
+      command: get
+      zone: "{{ hosted_zone_domain_name }}"
+      record: "{{ master_lb_dns }}"
+      type: A
+    register: masterelbrec
+
+  - name: Create Master ELB DNS Entry
+    route53:
+      #state: present ## Added in Ansible 2.4 will remove need for when statement below
+      command: create
+      zone: "{{ hosted_zone_domain_name }}"
+      record: "{{ master_lb_dns }}"
+      type: A
+      value: "{{ masterelb.elb.dns_name }}"
+      alias: True
+      alias_hosted_zone_id: "{{ masterelb.elb.hosted_zone_id }}"
+    when: "{} == masterelbrec.set"
+
+  - name: Create S3 Bucket for Registry 
+    s3_bucket:
+      name: "{{ registry_s3_name }}"
+      region: "{{ region }}"
+      tags:
+        Name: "{{ registry_s3_name }}"
+        Cluster: "{{ ocp_cluster_name }}"
+        ClusterRole: "{{ ocp_cluster_name }}-registry-s3"
+
+  - name: Create private / internal DNS Zone for cluster
+    route53_zone:
+      zone: "{{ zone_internal_dns }}"
+      region: "{{ region }}"
+      state: present
+      vpc_id: "{{ vpc_net.vpc.id }}"
+      vpc_region: "{{ region }}"
+      comment: "Ansible Generated - Internal DNS for OpenShift Cluster" 
+

@@ -1,0 +1,92 @@
+---
+
+# Run on all hosts with tag Cluster:{{ ocp_cluster_name }}
+- name: Wait for environment Readiness
+  hosts:
+    - "{{ ('tag_Cluster_' ~ ocp_cluster_name) | replace('-', '_') }}"
+  vars_files:
+    - "vars.yml"
+  gather_facts: false
+  any_errors_fatal: True
+  become: true
+  tasks:
+    - name: wait for host to be available
+      wait_for:
+        host: '{{ inventory_hostname }}'
+        port: 22
+        search_regex: OpenSSH
+      delegate_to: localhost
+      become: false
+
+- name: Setup repositories and update packages
+  hosts:
+    - "{{ ('tag_Cluster_' ~ ocp_cluster_name) | replace('-', '_') }}"
+  vars_files:
+    - "vars.yml"
+  gather_facts: false
+  any_errors_fatal: True
+  become: true
+  roles:
+    - { role: common }
+
+- name: Setup SSH from Bastion
+  hosts: 
+    - "{{ ('tag_ClusterRole_' ~ ocp_cluster_name ~ '_bastion') | replace('-', '_') }}"
+  vars_files:
+    - "vars.yml"
+  tasks: 
+    - name: Check if id_rsa exists
+      stat: 
+        path: /home/ec2-user/.ssh/id_rsa
+      register: id_rsa
+
+    - name: Creating pub SSH keys
+      command: ssh-keygen -N '' -f /home/ec2-user/.ssh/id_rsa
+      when: id_rsa.stat.exists == False
+
+    - name: Downloading pub key
+      fetch: src=~/.ssh/id_rsa.pub dest=/tmp/{{ocp_cluster_name}}_id_rsa.pub flat=yes
+      when: id_rsa.stat.exists == False
+
+    #- name: Coping local key to other.server.net
+    #  local_action: shell cat /tmp/{{ocp_cluster_name}}id_rsa.tmp | ssh -p 2244 root@other.server.net "cat >> /root/.ssh/authorized_keys"
+
+- name: Configuring openshift systems
+  hosts:
+    - "{{ ('tag_ClusterRole_' ~ ocp_cluster_name ~ '_infranode') | replace('-', '_') }}"
+    - "{{ ('tag_ClusterRole_' ~ ocp_cluster_name ~ '_node') | replace('-', '_') }}"
+    - "{{ ('tag_ClusterRole_' ~ ocp_cluster_name ~ '_master') | replace('-', '_') }}"
+  #vars: 
+  #  ansible_user: ec2-user
+  #  ocp_cluster_name: ocp1
+  vars_files:
+    - "vars.yml"
+  gather_facts: False
+  become: true
+  tasks: 
+    - name: Check if id_rsa.pub temp file exists
+      become: false
+      local_action:
+        module: stat
+        path: /tmp/{{ocp_cluster_name}}_id_rsa.pub
+      register: local_id_rsa
+
+    - name: Set authorized key took from file
+      authorized_key:
+        user: ec2-user
+        state: present
+        key: "{{ lookup('file', '/tmp/{{ocp_cluster_name}}_id_rsa.pub') }}"
+        #key: "{{ lookup('file', '/home/ec2-user/{{ocp_cluster_name}}_id_rsa.pub') }}"
+      when: local_id_rsa.stat.exists == True
+
+    - name: Delete local ssh key
+      become: false
+      local_action: 
+        module: file
+        path: /tmp/{{ocp_cluster_name}}_id_rsa.pub
+        state: absent
+      when: local_id_rsa.stat.exists == True
+      ignore_errors: true
+  roles:
+    - { role: openshift_common }
+

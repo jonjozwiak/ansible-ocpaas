@@ -1,0 +1,136 @@
+  - name: Get EC2 VPC Facts
+    ec2_vpc_net_facts:
+      region: "{{ region }}"
+      filters:
+        "tag:Name": "{{ vpc_name }}"
+    register: vpc_net
+    when: create_vpc
+
+  - name: Delete private / internal DNS Zone for cluster
+    route53_zone:
+      zone: "{{ zone_internal_dns }}"
+      state: absent
+
+  - name: Get record for master ELB DNS Entry
+    route53:
+      command: get
+      zone: "{{ hosted_zone_domain_name }}"
+      record: "{{ master_lb_dns }}"
+      type: A
+    register: masterelbrec
+
+  - name: Delete Master ELB DNS Entry if it exists
+    route53:
+      #state: absent ## Added in Ansible 2.4 will remove need for when statement below
+      command: delete
+      zone: "{{ hosted_zone_domain_name }}"
+      record: "{{ master_lb_dns }}"
+      type: A
+      value: "{{ masterelbrec.set.value }}"
+      alias: True
+      alias_hosted_zone_id: "{{ masterelbrec.set.alias_hosted_zone_id }}"
+    when: "{} != masterelbrec.set"
+
+  - name: Get record for router ELB DNS Entry
+    route53:
+      command: get
+      zone: "{{ hosted_zone_domain_name }}"
+      record: "{{ apps_wildcard_dns }}"
+      type: A
+    register: routerelbrec
+
+  - name: Delete Router ELB DNS Entry if it exists
+    route53:
+      #state: absent ## Added in Ansible 2.4 will remove need for when statement below
+      command: delete
+      zone: "{{ hosted_zone_domain_name }}"
+      record: "{{ apps_wildcard_dns }}"
+      type: A
+      value: "{{ routerelbrec.set.value }}"
+      alias: True
+      alias_hosted_zone_id: "{{ routerelbrec.set.alias_hosted_zone_id }}"
+    when: "{} != routerelbrec.set"
+
+  - name: Remove Registry S3 Bucket
+    s3_bucket:
+      name: "{{ registry_s3_name }}"
+      region: "{{ region }}"
+      state: absent
+      force: yes
+
+  - name: Remove Master Load Balancer
+    ec2_elb_lb:
+      name: "{{ master_lb_name }}"
+      region: "{{ region }}"
+      state: absent
+      wait: yes
+      wait_timeout: 600
+
+  - name: Remove Router Load Balancer
+    ec2_elb_lb:
+      name: "{{ router_lb_name }}"
+      region: "{{ region }}"
+      state: absent
+      wait: yes
+      wait_timeout: 600
+
+  - name: Remove security group - ignore error if vpc doesn't exist
+    ec2_group:
+      name: "{{ security_group_name }}"
+      description: "{{ security_group_name }}"
+      vpc_id: "{{ vpc_net.vpcs[0].id }}"
+      region: "{{ region }}"
+      state: absent
+      #rules:  
+      #  - proto: udp
+      #    from_port: 0
+      #    to_port: 65535
+      #    cidr_ip: 0.0.0.0/0
+      #  - proto: tcp
+      #    from_port: 0
+      #    to_port: 65535
+      #    cidr_ip: 0.0.0.0/0
+
+  - name: Remove public subnet route table
+    ec2_vpc_route_table:
+      state: absent
+      vpc_id: "{{ vpc_net.vpcs[0].id }}"
+      region: "{{ region }}"
+      tags:
+        Name: Public
+  #    subnets:
+  #      - "{{ vpc_subnet.subnet.id }}"
+  #    routes:
+  #      - dest: 0.0.0.0/0
+  #        gateway_id: "{{ igw.gateway_id }}"
+  #  register: public_route_table
+
+  - name: Remove Internet Gateway
+    ec2_vpc_igw:
+      vpc_id: "{{ vpc_net.vpcs[0].id }}"
+      state: absent
+      region: "{{ region }}"
+    when: create_vpc
+
+  - name: Remove EC2 VPC Subnet
+    ec2_vpc_subnet:
+      state: absent
+      vpc_id: "{{ vpc_net.vpcs[0].id }}"
+      cidr: "{{ vpc_subnet_cidr }}"
+      region: "{{ region }}"
+    when: create_vpc
+
+  - name: Remove EC2 VPC
+    ec2_vpc_net:
+      name: "{{ vpc_name }}"
+      cidr_block: "{{ vpc_cidr_block }}"
+      region: "{{ region }}"
+      state: absent
+    when: create_vpc
+
+  - name: Remove Key Pair
+    ec2_key:
+      name: "{{ keypair }}"
+      region: "{{ region }}"
+      state: absent
+

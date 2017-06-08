@@ -1,0 +1,60 @@
+---
+region: "us-east-1"
+keypair: "mykeypair"            # Name of keypair to be created in AWS
+security_group_name: "openshiftsg"
+
+amis:
+  us-east-1: "ami-b63769a1"
+  us-east-2: "ami-0932686c"
+  us-west-1: "ami-2cade64c"
+  us-west-2: "ami-6f68cf0f"
+  eu-west-1: "ami-02ace471"
+  eu-central-1: "ami-e4c63e8b"
+  ap-northeast-1: "ami-5de0433c"
+  ap-northeast-2: "ami-44db152a"
+  ap-southeast-1: "ami-2c95344f"
+  ap-southeast-2: "ami-39ac915a"
+  sa-east-1: "ami-7de77b11"
+  ap-south-1: "ami-cdbdd7a2"
+
+##### Environment Sizing #####
+# t2.micro = 1vCPU, 1GB RAM
+# t2.small = 1vCPU, 2GB RAM
+# t2.medium = 2vCPU, 4GB RAM
+# t2.large = 2vCPU, 8GB RAM
+# t2.xlarge = 4vCPU, 16GB RAM
+bastion_instance_type: "t2.small"
+node_instance_type: "t2.large"
+infranode_instance_type: "t2.large"
+master_instance_type: "t2.large"
+
+#bastion_instance_type: "t2.micro"
+#node_instance_type: "t2.micro"
+#infranode_instance_type: "t2.micro"
+#master_instance_type: "t2.micro"
+
+bastion_instance_count: 1
+node_instance_count: 2
+infranode_instance_count: 1
+master_instance_count: 1
+
+delete_volumes_on_termination: false
+node_disk1_size: 30
+node_disk2_size: 100
+infranode_disk1_size: 30
+infranode_disk2_size: 50
+master_disk1_size: 30
+master_disk2_size: 20
+
+ocp_cluster_name: ocp1
+router_lb_name: elbrouter-{{ ocp_cluster_name }}
+master_lb_name: elbmaster-{{ ocp_cluster_name }}
+registry_s3_name: registry-s3-{{ ocp_cluster_name }}
+
+hosted_zone_domain_name: example.com
+public_dns: "{{ ocp_cluster_name }}.{{ hosted_zone_domain_name }}"
+zone_internal_dns: "{{ ocp_cluster_name }}.internal."
+chomped_zone_internal_dns: "{{ ocp_cluster_name }}.internal"
+
+#vpc_subnet_id: subnet-f101dadd
+

@@ -1,0 +1,26 @@
+repo_version: '3.5'
+rhel_repos:
+  - rhel-7-server-rpms
+  - rhel-7-fast-datapath-rpms
+  - rhel-7-server-extras-rpms
+  - rhel-7-server-ose-{{repo_version}}-rpms
+
+#rhn_pool_id_string: "Red Hat Enterprise Linux Server"
+rhn_pool_id_string: OpenShift Container Platform
+
+update_packages: true
+common_packages: 
+  - python
+  - unzip
+  - bash-completion
+  - tmux
+  - bind-utils
+  - wget
+  - git
+  - vim-enhanced
+  - ansible
+  - atomic-openshift-utils
+
+# atomic-openshift-utils needed on bastion for openshift byo playbook run
+
+use_subscription_manager: true
