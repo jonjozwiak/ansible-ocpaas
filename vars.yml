@@ -10,8 +10,6 @@ install_idm: htpasswd
 multi_tenant: false
 delete_volumes_on_termination: true
 # Note - below not needed when run from Tower... 
-#aws_access_key_id: ""
-#aws_secret_access_key: ""
 #aws_access_key_id:  YourKey
 #aws_secret_access_key: YourSecret
 
