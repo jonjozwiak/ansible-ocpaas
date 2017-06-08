@@ -228,16 +228,12 @@ ocp-openshift-deploy
 
 Test by launching ocp-deploy ... 
 
-== Tower CLI 
-- name: Install pip
-  yum:
-    name: python2-pip
-    state: present
-  become: true
+## Tower CLI 
 
-- name: Install Tower CLI
-  pip:
-    name: ansible-tower-cli
-  become: true
+```
+yum localinstall https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+yum --enablerepo=epel install python2-pip
+pip install ansible-tower-cli 
+```
 
 
